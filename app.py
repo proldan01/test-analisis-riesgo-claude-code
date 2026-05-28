@@ -56,76 +56,130 @@ st.set_page_config(
 # ============================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ── Base ─────────────────────────────────────────────────── */
 html, body, [data-testid="stAppViewContainer"], .stApp {
-    background-color: #080810 !important;
-    color: #d0d0d0 !important;
+    background-color: #0f1923 !important;   /* dark navy — readable, not pure black */
+    color: #dce8f5 !important;
     font-family: 'Inter', sans-serif;
 }
-.main .block-container { padding: 1rem 1.5rem 2rem 1.5rem; max-width: 100%; }
-section[data-testid="stSidebar"] { background-color: #0d0d1a !important; border-right: 1px solid #1e1e3a; }
+.main .block-container { padding: 1rem 1.8rem 2rem 1.8rem; max-width: 100%; }
+
+/* ── Sidebar ──────────────────────────────────────────────── */
+section[data-testid="stSidebar"] {
+    background-color: #121e2d !important;
+    border-right: 1px solid #1e3550;
+}
 section[data-testid="stSidebar"] .block-container { padding: 1rem; }
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span { color: #b8cce0 !important; }
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] select { background:#1a2e44 !important; color:#dce8f5 !important; }
 
-h1,h2,h3,h4 { color: #e8e8e8 !important; }
-p, li, span { color: #b0b0c8; }
+/* ── Typography ──────────────────────────────────────────── */
+h1,h2,h3,h4 { color: #f0f6ff !important; }
+p, li       { color: #b8cce0; }
+span        { color: inherit; }
+caption, small, .stCaption { color: #7a9ab8 !important; }
 
-/* KPI cards */
+/* ── KPI cards ───────────────────────────────────────────── */
 .kpi-card {
-    background: linear-gradient(135deg,#0e0e20 0%,#141430 100%);
-    border: 1px solid #1e1e3a; border-radius: 10px;
+    background: linear-gradient(135deg, #162233 0%, #1c2d44 100%);
+    border: 1px solid #1e3550; border-radius: 10px;
     padding: 14px 16px; margin: 6px 0;
     transition: border-color .25s, box-shadow .25s;
 }
-.kpi-card:hover { border-color: #00e87a; box-shadow: 0 0 18px rgba(0,232,122,.12); }
-.kpi-label  { color: #5a5a7a; font-size: .72em; text-transform: uppercase; letter-spacing: .08em; }
+.kpi-card:hover { border-color: #00e87a; box-shadow: 0 0 20px rgba(0,232,122,.14); }
+.kpi-label  { color: #7090b0; font-size: .72em; text-transform: uppercase; letter-spacing: .08em; }
 .kpi-ticker { color: #ffd700; font-size: 1em; font-weight: 700; font-family: 'Share Tech Mono', monospace; }
-.kpi-price  { font-size: 1.5em; font-weight: 700; color: #e8e8e8; }
-.kpi-change-pos { color: #00e87a; font-size: .9em; }
-.kpi-change-neg { color: #ff4545; font-size: .9em; }
-.kpi-sub    { color: #3a3a5a; font-size: .72em; margin-top: 4px; }
+.kpi-price  { font-size: 1.5em; font-weight: 700; color: #f0f6ff; }
+.kpi-change-pos { color: #00e87a; font-size: .9em; font-weight: 600; }
+.kpi-change-neg { color: #ff5555; font-size: .9em; font-weight: 600; }
+.kpi-sub    { color: #5a7a96; font-size: .72em; margin-top: 4px; }
 
-/* Signal badges */
-.sig-buy  { background:linear-gradient(135deg,#00331a,#004d28); border:1px solid #00e87a; color:#00e87a; padding:7px 18px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; }
-.sig-sell { background:linear-gradient(135deg,#330000,#4d0000); border:1px solid #ff4545; color:#ff4545; padding:7px 18px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; }
-.sig-hold { background:linear-gradient(135deg,#332800,#4d3c00); border:1px solid #ffd700; color:#ffd700; padding:7px 18px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; }
+/* ── Signal badges ───────────────────────────────────────── */
+.sig-buy  { background:linear-gradient(135deg,#003d20,#005530); border:1px solid #00e87a; color:#00e87a; padding:8px 20px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; font-size:.95em; }
+.sig-sell { background:linear-gradient(135deg,#3d0000,#550000); border:1px solid #ff5555; color:#ff5555; padding:8px 20px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; font-size:.95em; }
+.sig-hold { background:linear-gradient(135deg,#3d3000,#554400); border:1px solid #ffd700; color:#ffd700; padding:8px 20px; border-radius:20px; font-weight:700; text-align:center; display:inline-block; font-family:'Share Tech Mono',monospace; letter-spacing:.1em; font-size:.95em; }
 
-/* Section headers */
-.sec-hdr { border-left:3px solid #00e87a; padding-left:10px; color:#e0e0e0; font-size:1em; font-weight:600; margin:18px 0 10px; letter-spacing:.04em; }
-
-/* Sidebar section headers */
-.sb-sec {
-    color: #c0c0d8; font-size: .78em; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .12em;
-    margin: 14px 0 8px 0; padding: 6px 0 4px 0;
-    border-bottom: 1px solid #1e1e3a;
+/* ── Section headers ─────────────────────────────────────── */
+.sec-hdr {
+    border-left: 3px solid #00e87a; padding-left: 10px;
+    color: #e8f2fc; font-size: 1em; font-weight: 600;
+    margin: 18px 0 10px; letter-spacing: .04em;
 }
 
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] { background:#0d0d1a; border-bottom:1px solid #1e1e3a; gap:4px; }
-.stTabs [data-baseweb="tab"] { color:#5a5a7a; font-weight:500; padding:8px 18px; border-radius:6px 6px 0 0; }
-.stTabs [aria-selected="true"] { color:#00e87a !important; border-bottom:2px solid #00e87a !important; background:#0e0e20 !important; }
+/* ── Sidebar section headers ─────────────────────────────── */
+.sb-sec {
+    color: #8aacca; font-size: .76em; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .13em;
+    margin: 14px 0 8px 0; padding: 5px 0 4px 0;
+    border-bottom: 1px solid #1e3550;
+}
 
-/* Dataframe */
-[data-testid="stDataFrame"] { border:1px solid #1e1e3a; border-radius:8px; }
+/* ── Tabs ────────────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] { background:#121e2d; border-bottom:1px solid #1e3550; gap:4px; }
+.stTabs [data-baseweb="tab"] { color:#6a8aa8; font-weight:500; padding:8px 18px; border-radius:6px 6px 0 0; }
+.stTabs [aria-selected="true"] { color:#00e87a !important; border-bottom:2px solid #00e87a !important; background:#162233 !important; }
 
-/* Metric component */
-[data-testid="metric-container"] { background:#0e0e20; border:1px solid #1e1e3a; border-radius:8px; padding:10px 14px; }
-[data-testid="metric-container"] label { color:#5a5a7a !important; font-size:.75em !important; text-transform:uppercase; letter-spacing:.05em; }
-[data-testid="stMetricValue"] { color:#e8e8e8 !important; font-family:'Share Tech Mono',monospace; }
+/* ── Dataframe ───────────────────────────────────────────── */
+[data-testid="stDataFrame"] { border:1px solid #1e3550; border-radius:8px; }
+.stDataFrame tbody tr td { color:#cce0f5 !important; }
+.stDataFrame thead tr th { background:#162233 !important; color:#8aacca !important; }
 
-/* News card */
-.news-card { background:#0e0e20; border:1px solid #1e1e3a; border-radius:8px; padding:10px 14px; margin:6px 0; }
-.news-link { color:#4da6ff; text-decoration:none; font-size:.88em; }
-.news-pub  { color:#3a3a5a; font-size:.72em; margin-top:3px; }
+/* ── Metric component ────────────────────────────────────── */
+[data-testid="metric-container"] {
+    background: #162233; border: 1px solid #1e3550;
+    border-radius: 8px; padding: 10px 14px;
+}
+[data-testid="metric-container"] label { color:#7090b0 !important; font-size:.75em !important; text-transform:uppercase; letter-spacing:.05em; }
+[data-testid="stMetricValue"]  { color:#f0f6ff !important; font-family:'Share Tech Mono',monospace; }
+[data-testid="stMetricDelta"]  { font-size:.85em !important; }
 
-/* VIX bar */
-.vix-bar { background:linear-gradient(135deg,#0e0e20,#141430); border:1px solid #1e1e3a; border-radius:10px; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+/* ── Inputs & selects ────────────────────────────────────── */
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stSelectbox"] div[data-baseweb="select"] div {
+    background: #1a2e44 !important;
+    color: #dce8f5 !important;
+    border-color: #1e3550 !important;
+}
 
-/* MC insight box */
-.mc-box { background:#0e0e20; border:1px solid #1e1e3a; border-left:3px solid #4da6ff; border-radius:8px; padding:14px 16px; margin:10px 0; font-size:.85em; line-height:1.6; }
+/* ── News card ───────────────────────────────────────────── */
+.news-card { background:#162233; border:1px solid #1e3550; border-radius:8px; padding:10px 14px; margin:6px 0; }
+.news-link { color:#5aadff; text-decoration:none; font-size:.88em; }
+.news-pub  { color:#5a7a96; font-size:.72em; margin-top:3px; }
 
-/* Primary button */
+/* ── VIX bar ─────────────────────────────────────────────── */
+.vix-bar {
+    background: linear-gradient(135deg,#162233,#1c2d44);
+    border: 1px solid #1e3550; border-radius: 10px;
+    padding: 12px 20px; display: flex;
+    justify-content: space-between; align-items: center;
+}
+
+/* ── MC insight box ──────────────────────────────────────── */
+.mc-box {
+    background: #162233; border: 1px solid #1e3550;
+    border-left: 3px solid #5aadff;
+    border-radius: 8px; padding: 14px 18px;
+    margin: 10px 0; font-size: .86em; line-height: 1.7;
+    color: #c0d8f0;
+}
+
+/* ── Expander ────────────────────────────────────────────── */
+[data-testid="stExpander"] { border: 1px solid #1e3550 !important; border-radius: 8px !important; background: #162233 !important; }
+[data-testid="stExpander"] summary { color: #b8cce0 !important; }
+
+/* ── Checkbox labels ─────────────────────────────────────── */
+[data-testid="stCheckbox"] label span { color: #b8cce0 !important; }
+
+/* ── Slider ──────────────────────────────────────────────── */
+[data-testid="stSlider"] label { color: #b8cce0 !important; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #1a52c0 0%, #1e5edb 100%) !important;
     border: 1px solid #2a72f0 !important; color: #fff !important;
@@ -136,15 +190,20 @@ p, li, span { color: #b0b0c8; }
     background: linear-gradient(135deg, #1e5edb 0%, #2266f0 100%) !important;
     box-shadow: 0 0 22px rgba(30,94,219,.45) !important;
 }
-
-/* Secondary buttons (add/remove) */
 .stButton > button[kind="secondary"] {
-    background: linear-gradient(135deg, #12122a 0%, #1a1a38 100%) !important;
-    border: 1px solid #2a2a4a !important; color: #c0c0d8 !important;
-    border-radius: 8px !important;
+    background: #162233 !important; border: 1px solid #1e3550 !important;
+    color: #b8cce0 !important; border-radius: 8px !important;
+}
+.stButton > button[kind="secondary"]:hover {
+    border-color: #00e87a !important; color: #00e87a !important;
 }
 
-/* Hide Streamlit chrome */
+/* ── Info / warning boxes ────────────────────────────────── */
+[data-testid="stInfo"]    { background:#162d42 !important; border-color:#2a5078 !important; color:#b8d8f8 !important; }
+[data-testid="stWarning"] { background:#2a1f0a !important; border-color:#5a4010 !important; color:#f0c060 !important; }
+[data-testid="stError"]   { background:#2a0a0a !important; border-color:#5a1010 !important; color:#f08080 !important; }
+
+/* ── Hide Streamlit chrome ───────────────────────────────── */
 #MainMenu{visibility:hidden;} footer{visibility:hidden;} header{visibility:hidden;}
 div[data-testid="stDecoration"]{display:none;}
 </style>
@@ -529,22 +588,22 @@ def echarts_heatmap(matrix: pd.DataFrame, title: str,
     data = [[j, i, round(float(matrix.iloc[i, j]), 4)]
             for i in range(len(cols)) for j in range(len(cols))]
     return {
-        "backgroundColor": "#080810",
+        "backgroundColor": "#0f1923",
         "title": {"text": title, "textStyle": {"color": "#e0e0e0", "fontSize": 13}},
         "tooltip": {"position": "top"},
         "grid": {"height": "72%", "top": "12%", "left": "12%", "right": "4%"},
         "xAxis": {"type": "category", "data": cols,
-                  "axisLabel": {"color": "#888", "fontSize": 11},
-                  "splitArea": {"show": True, "areaStyle": {"color": ["#0d0d1a", "#111125"]}}},
+                  "axisLabel": {"color": "#94a3b8", "fontSize": 11},
+                  "splitArea": {"show": True, "areaStyle": {"color": ["#162233", "#1a2840"]}}},
         "yAxis": {"type": "category", "data": cols,
-                  "axisLabel": {"color": "#888", "fontSize": 11},
-                  "splitArea": {"show": True, "areaStyle": {"color": ["#0d0d1a", "#111125"]}}},
+                  "axisLabel": {"color": "#94a3b8", "fontSize": 11},
+                  "splitArea": {"show": True, "areaStyle": {"color": ["#162233", "#1a2840"]}}},
         "visualMap": {
             "min": -1, "max": 1,
             "calculable": True, "orient": "horizontal",
             "left": "center", "bottom": "3%",
-            "inRange": {"color": [color_min, "#111125", color_max]},
-            "textStyle": {"color": "#888"},
+            "inRange": {"color": [color_min, "#1a2840", color_max]},
+            "textStyle": {"color": "#94a3b8"},
         },
         "series": [{"name": title, "type": "heatmap", "data": data,
                     "label": {"show": True, "color": "#e0e0e0", "fontSize": 10},
@@ -567,33 +626,33 @@ def echarts_area_animated(dates_list: list, series_dict: dict, title: str = "") 
             "animationEasing": "cubicOut",
         })
     return {
-        "backgroundColor": "#080810",
+        "backgroundColor": "#0f1923",
         "animation": True,
         "title": {"text": title, "textStyle": {"color": "#e0e0e0", "fontSize": 12}},
         "tooltip": {
             "trigger": "axis",
-            "backgroundColor": "rgba(8,8,20,.95)",
-            "borderColor": "#1e1e3a",
-            "textStyle": {"color": "#d0d0d0", "fontSize": 11},
+            "backgroundColor": "rgba(15,25,35,.97)",
+            "borderColor": "#1e3550",
+            "textStyle": {"color": "#dce8f5", "fontSize": 11},
         },
-        "legend": {"textStyle": {"color": "#888"}, "top": "5%"},
+        "legend": {"textStyle": {"color": "#94a3b8"}, "top": "5%"},
         "grid": {"left": "6%", "right": "3%", "bottom": "12%", "containLabel": True},
         "xAxis": {
             "type": "category", "data": dates_list,
-            "axisLabel": {"color": "#555", "fontSize": 10},
-            "axisLine": {"lineStyle": {"color": "#1e1e3a"}},
+            "axisLabel": {"color": "#7a9ab8", "fontSize": 10},
+            "axisLine": {"lineStyle": {"color": "#1e3550"}},
             "boundaryGap": False,
         },
         "yAxis": {
             "type": "value",
-            "splitLine": {"lineStyle": {"color": "#141428"}},
-            "axisLabel": {"color": "#555", "fontSize": 10},
+            "splitLine": {"lineStyle": {"color": "#1e3550"}},
+            "axisLabel": {"color": "#7a9ab8", "fontSize": 10},
         },
         "dataZoom": [
             {"type": "inside", "start": 60, "end": 100},
             {"type": "slider", "start": 60, "end": 100,
              "borderColor": "#1e1e3a", "fillerColor": "rgba(0,232,122,.08)",
-             "textStyle": {"color": "#555"}, "bottom": "1%"},
+             "textStyle": {"color": "#7a9ab8"}, "bottom": "1%"},
         ],
         "series": series,
     }
@@ -754,21 +813,21 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
     })
 
     return {
-        "backgroundColor": "#080810",
+        "backgroundColor": "#0f1923",
         "animation": True, "animationDuration": 800,
         "tooltip": {
             "trigger": "axis", "axisPointer": {"type": "cross"},
-            "backgroundColor": "rgba(8,8,20,.95)",
-            "borderColor": "#1e1e3a",
-            "textStyle": {"color": "#d0d0d0", "fontSize": 11},
+            "backgroundColor": "rgba(15,25,35,.97)",
+            "borderColor": "#1e3550",
+            "textStyle": {"color": "#dce8f5", "fontSize": 11},
         },
         # Scrollable legend – prevents overlap
         "legend": {
             "type": "scroll",
             "data": legend_items,
             "top": "0%", "left": "center", "width": "96%",
-            "pageIconColor": "#888", "pageTextStyle": {"color": "#888"},
-            "textStyle": {"color": "#888", "fontSize": 10},
+            "pageIconColor": "#94a3b8", "pageTextStyle": {"color": "#94a3b8"},
+            "textStyle": {"color": "#94a3b8", "fontSize": 10},
             "icon": "roundRect", "itemHeight": 8, "itemGap": 14,
         },
         "axisPointer": {"link": [{"xAxisIndex": "all"}]},
@@ -780,31 +839,31 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
         "xAxis": [
             {"type": "category", "data": all_dates, "gridIndex": 0,
              "axisLabel": {"show": False},
-             "axisLine": {"lineStyle": {"color": "#1e1e3a"}}, "splitLine": {"show": False}},
+             "axisLine": {"lineStyle": {"color": "#1e3550"}}, "splitLine": {"show": False}},
             {"type": "category", "data": dates, "gridIndex": 1,
              "axisLabel": {"show": False},
-             "axisLine": {"lineStyle": {"color": "#1e1e3a"}}},
+             "axisLine": {"lineStyle": {"color": "#1e3550"}}},
             {"type": "category", "data": dates, "gridIndex": 2,
-             "axisLabel": {"color": "#555", "fontSize": 9},
-             "axisLine": {"lineStyle": {"color": "#1e1e3a"}}},
+             "axisLabel": {"color": "#6a8aa8", "fontSize": 9},
+             "axisLine": {"lineStyle": {"color": "#1e3550"}}},
         ],
         "yAxis": [
             {"scale": True, "gridIndex": 0,
-             "splitLine": {"lineStyle": {"color": "#111125"}},
-             "axisLabel": {"color": "#555", "fontSize": 10}},
+             "splitLine": {"lineStyle": {"color": "#1e3550"}},
+             "axisLabel": {"color": "#7a9ab8", "fontSize": 10}},
             {"scale": True, "gridIndex": 1, "splitNumber": 2,
-             "axisLabel": {"color": "#555", "fontSize": 9},
-             "splitLine": {"lineStyle": {"color": "#111125"}}},
+             "axisLabel": {"color": "#6a8aa8", "fontSize": 9},
+             "splitLine": {"lineStyle": {"color": "#1e3550"}}},
             {"scale": True, "gridIndex": 2, "min": 0, "max": 100, "splitNumber": 2,
-             "axisLabel": {"color": "#555", "fontSize": 9},
-             "splitLine": {"lineStyle": {"color": "#111125"}}},
+             "axisLabel": {"color": "#6a8aa8", "fontSize": 9},
+             "splitLine": {"lineStyle": {"color": "#1e3550"}}},
         ],
         "dataZoom": [
             {"type": "inside", "xAxisIndex": [0, 1, 2], "start": 70, "end": 100},
             {"type": "slider", "xAxisIndex": [0, 1, 2], "start": 70, "end": 100,
-             "bottom": "1%", "height": 18, "borderColor": "#1e1e3a",
-             "fillerColor": "rgba(0,232,122,.08)",
-             "textStyle": {"color": "#555"}},
+             "bottom": "1%", "height": 18, "borderColor": "#1e3550",
+             "fillerColor": "rgba(0,232,122,.10)",
+             "textStyle": {"color": "#7a9ab8"}},
         ],
         "series": series,
     }
@@ -816,11 +875,13 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
 def _dark_layout(**kw):
     base = dict(
         template="plotly_dark",
-        paper_bgcolor="#080810",
-        plot_bgcolor="#0d0d1a",
-        font=dict(color="#888", size=11),
+        paper_bgcolor="#0f1923",
+        plot_bgcolor="#162233",
+        font=dict(color="#94a3b8", size=11),
         margin=dict(l=50, r=20, t=45, b=40),
         hovermode="x unified",
+        xaxis=dict(gridcolor="#1e3550", zerolinecolor="#1e3550"),
+        yaxis=dict(gridcolor="#1e3550", zerolinecolor="#1e3550"),
     )
     base.update(kw)
     return base
@@ -1024,8 +1085,12 @@ def plotly_mc_frontier(mc: dict) -> go.Figure:
             color=mc["sharpes"],
             colorscale=[[0,"#ff4545"],[0.5,"#ffd700"],[1,"#00e87a"]],
             size=3, opacity=0.55,
-            colorbar=dict(title="Sharpe", tickfont=dict(color="#888"),
-                          titlefont=dict(color="#888")),
+            colorbar=dict(
+                title=dict(text="Sharpe", font=dict(color="#94a3b8")),
+                tickfont=dict(color="#94a3b8"),
+                bgcolor="rgba(0,0,0,0)",
+                outlinewidth=0,
+            ),
         ),
         text=[f"Sharpe: {s:.2f}" for s in mc["sharpes"]],
         hovertemplate="Vol: %{x:.1f}%<br>Ret: %{y:.1f}%<br>%{text}<extra></extra>",
@@ -1135,12 +1200,12 @@ def vix_widget(vix_df: pd.DataFrame):
     st.markdown(f"""
     <div class="vix-bar">
       <div>
-        <span style="color:#3a3a5a;font-size:.72em;text-transform:uppercase;letter-spacing:.08em;">CBOE VIX</span><br>
+        <span style="color:#7090b0;font-size:.72em;text-transform:uppercase;letter-spacing:.08em;">CBOE VIX</span><br>
         <span style="color:{col};font-size:1.9em;font-weight:700;font-family:'Share Tech Mono',monospace;">{cur:.2f}</span>
         <span style="color:{ch_col};font-size:.9em;margin-left:8px;">{arrow} {abs(chg):.2f}</span>
       </div>
       <div style="text-align:right;">
-        <span style="color:#3a3a5a;font-size:.72em;">MARKET REGIME</span><br>
+        <span style="color:#7090b0;font-size:.72em;">MARKET REGIME</span><br>
         <span style="color:{col};font-weight:600;font-size:.9em;">{regime}</span>
       </div>
     </div>
@@ -1293,7 +1358,7 @@ def main():
                    font-family:'Share Tech Mono',monospace;">
         📈 Financial Intelligence Platform
       </span><br>
-      <span style="color:#3a3a5a;font-size:.8em;">
+      <span style="color:#7090b0;font-size:.8em;">
         Risk &amp; Return · Technical Analysis · ML Signals · Valuation · Forecasting
       </span>
     </div>
@@ -1574,7 +1639,7 @@ def main():
             elif PLOTLY_OK:
                 fig_cr = go.Figure(go.Heatmap(
                     z=corr.values, x=corr.columns.tolist(), y=corr.columns.tolist(),
-                    colorscale=[[0,"#ff4545"],[.5,"#0d0d1a"],[1,"#00e87a"]],
+                    colorscale=[[0,"#ff4545"],[.5,"#162233"],[1,"#00e87a"]],
                     zmid=0, text=corr.values.round(3), texttemplate="%{text}",
                     textfont=dict(size=11)))
                 fig_cr.update_layout(title="Correlation Matrix", **_dark_layout(height=460))
@@ -1758,7 +1823,7 @@ to hold a portfolio on or near the frontier.
             st.markdown(f"""
             <div class="kpi-card">
               <h3 style="color:#ffd700;margin:0;">{nm}</h3>
-              <div style="color:#3a3a5a;font-size:.82em;">{sec} · {ind} · {ctr}</div>
+              <div style="color:#7090b0;font-size:.82em;">{sec} · {ind} · {ctr}</div>
             </div>""", unsafe_allow_html=True)
 
             st.markdown("#### Key Fundamentals")
