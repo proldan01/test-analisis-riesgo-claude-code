@@ -404,6 +404,250 @@ def ml_signals(df: pd.DataFrame) -> pd.Series:
         return pd.Series(0, index=df.index)
 
 # ============================================================
+# TREND FOLLOW SIGNALS  (Tradeknowlogy-style multi-timeframe)
+# ============================================================
+
+def trend_follow_signals(df: pd.DataFrame) -> dict:
+    """
+    Multi-timeframe trend filter inspired by the Tradeknowlogy indicator.
+
+    Conditions (approximated on daily bars):
+      Weekly trend : EMA 65 > EMA 130   (≈ weekly EMA-13 > EMA-26)
+      Daily trend  : EMA 50 > EMA 200
+      Swing trend  : EMA 20 > EMA 50
+      Short trend  : EMA 5  > EMA 20
+      Oversold     : RSI-14 < 30
+      Overbought   : RSI-14 > 70
+
+    Candle colors:
+      green  = weekly + daily + short all bullish   (best quality: trade it)
+      purple = weekly + daily bullish, short not yet (early/continuation setup)
+      default= standard Heikin Ashi red/green        (no clear trend)
+    """
+    p = df["Close"].dropna()
+
+    e5   = ema(p, 5)
+    e18  = ema(p, 18)
+    e20  = ema(p, 20)
+    e50  = ema(p, 50)
+    e100 = ema(p, 100)
+    e200 = ema(p, 200) if len(p) >= 50  else pd.Series(np.nan, index=p.index)
+    e65  = ema(p, 65)
+    e130 = ema(p, 130) if len(p) >= 100 else pd.Series(np.nan, index=p.index)
+    rsi14 = rsi(p, 14)
+
+    def sg(a, b):
+        return (a > b).fillna(False)
+
+    weekly_up  = sg(e65, e130)
+    daily_up   = sg(e50, e200)
+    swing_up   = sg(e20, e50)
+    short_up   = sg(e5,  e20)
+    oversold   = (rsi14 < 30).fillna(False)
+    overbought = (rsi14 > 70).fillna(False)
+
+    # Candle color
+    candle_color = pd.Series("default", index=p.index)
+    candle_color[weekly_up & daily_up & short_up]  = "green"
+    candle_color[weekly_up & daily_up & ~short_up] = "purple"
+
+    # Buy signals
+    near_e18  = ((p >= e18 * 0.98) & (p <= e18 * 1.02))
+    buy_green = (near_e18 & weekly_up & daily_up).fillna(False)     # green △: buy zone
+    buy_blue  = (oversold  & weekly_up & daily_up).fillna(False)    # blue △: oversold + uptrend
+
+    # Sell signals
+    sell_red    = (near_e18 & ~daily_up).fillna(False)              # red ▽: sell zone
+    sell_fucsia = (overbought & ~weekly_up).fillna(False)           # fucsia ▽: overbought + downtrend
+
+    # EMA bounce marks
+    bounce_b18  = ((p.shift(1) < e18.shift(1)) & (p >= e18) & weekly_up).fillna(False)
+    bounce_b50  = ((p.shift(1) < e50.shift(1)) & (p >= e50) & weekly_up).fillna(False)
+    e200_ok     = e200.notna()
+    bounce_b200 = ((p.shift(1) < e200.shift(1)) & (p >= e200) & e200_ok).fillna(False)
+    sell_b18    = ((p.shift(1) > e18.shift(1)) & (p <= e18) & ~weekly_up).fillna(False)
+
+    # Continuation pattern: EMA18 crosses above EMA50
+    ema18_cross = ((e18.shift(1) <= e50.shift(1)) & (e18 > e50)).fillna(False)
+
+    trend_score = (weekly_up.astype(int) + daily_up.astype(int) +
+                   swing_up.astype(int)  + short_up.astype(int))
+
+    return dict(
+        candle_color=candle_color,
+        buy_green=buy_green, buy_blue=buy_blue,
+        sell_red=sell_red,   sell_fucsia=sell_fucsia,
+        bounce_b18=bounce_b18, bounce_b50=bounce_b50,
+        bounce_b200=bounce_b200, sell_b18=sell_b18,
+        ema18_cross=ema18_cross, trend_score=trend_score,
+        weekly_up=weekly_up, daily_up=daily_up,
+        swing_up=swing_up,   short_up=short_up,
+        oversold=oversold,   overbought=overbought,
+        rsi14=rsi14,
+        e5=e5, e18=e18, e20=e20, e50=e50,
+        e100=e100, e200=e200, e65=e65, e130=e130,
+    )
+
+
+def ml_combo_score(df: pd.DataFrame, tfk: dict) -> pd.Series:
+    """
+    Combines Tradeknowlogy rule scores + Random Forest confirmation.
+    Returns: +2 strong buy, +1 buy, 0 neutral, -1 sell, -2 strong sell
+
+    Rule weights  (Tradeknowlogy logic):
+      buy_green  +0.8   sell_red    -0.8
+      buy_blue   +1.5   sell_fucsia -1.5  (highest confidence)
+      bounce_b18 +0.6   sell_b18    -0.6
+      bounce_b50 +0.4
+      trend_score bonus ±0.12 per point above/below 2
+    """
+    rule = pd.Series(0.0, index=df.index)
+    rule += tfk["buy_green"].astype(float)   * 0.8
+    rule += tfk["buy_blue"].astype(float)    * 1.5
+    rule -= tfk["sell_red"].astype(float)    * 0.8
+    rule -= tfk["sell_fucsia"].astype(float) * 1.5
+    rule += tfk["bounce_b18"].astype(float)  * 0.6
+    rule += tfk["bounce_b50"].astype(float)  * 0.4
+    rule -= tfk["sell_b18"].astype(float)    * 0.6
+    rule += (tfk["trend_score"] - 2) * 0.12
+
+    def to_sig(s):
+        sig = pd.Series(0, index=df.index)
+        sig[s >  1.0] = 2;  sig[(s > 0.35) & (s <= 1.0)] = 1
+        sig[s < -1.0] = -2; sig[(s < -0.35) & (s >= -1.0)] = -1
+        return sig
+
+    if not SKLEARN_OK or len(df) < 150:
+        return to_sig(rule)
+
+    try:
+        p = df["Close"].copy()
+
+        feat = pd.DataFrame(index=df.index)
+        feat["trend_sc"] = tfk["trend_score"]
+        feat["rsi"]      = tfk["rsi14"]
+        feat["p_e18"]    = (p / tfk["e18"] - 1).clip(-0.20, 0.20)
+        feat["p_e50"]    = (p / tfk["e50"] - 1).clip(-0.30, 0.30)
+        e200_ok = tfk["e200"].notna().any()
+        feat["p_e200"]   = (p / tfk["e200"] - 1).clip(-0.50, 0.50) if e200_ok else pd.Series(0.0, index=df.index)
+        feat["e18_e50"]  = (tfk["e18"] / tfk["e50"] - 1).clip(-0.15, 0.15)
+        feat["e50_e200"] = (tfk["e50"] / tfk["e200"] - 1).clip(-0.20, 0.20) if e200_ok else pd.Series(0.0, index=df.index)
+        feat["ret1"]     = p.pct_change(1)
+        feat["ret5"]     = p.pct_change(5)
+        feat["ret20"]    = p.pct_change(20)
+        feat["vol20"]    = feat["ret1"].rolling(20).std()
+        bb_u, _, bb_l    = bollinger(p)
+        feat["bb_pos"]   = ((p - bb_l) / (bb_u - bb_l + 1e-9)).clip(0, 1)
+        ml_l, ms_l, _    = macd(p)
+        feat["macd_h"]   = (ml_l - ms_l).clip(-5, 5)
+        feat["rule_sc"]  = rule
+
+        fwd  = p.pct_change(5).shift(-5)
+        lbl  = pd.cut(fwd, bins=[-np.inf, -0.02, 0.02, np.inf], labels=[-1, 0, 1])
+        data = feat.join(lbl.rename("y")).dropna()
+
+        if len(data) < 100:
+            raise ValueError("insufficient data")
+
+        X = data.drop("y", axis=1).values
+        y = data["y"].astype(int).values
+        sc  = StandardScaler()
+        X_s = sc.fit_transform(X)
+        sp  = int(len(X_s) * 0.75)
+
+        clf = RandomForestClassifier(
+            n_estimators=120, max_depth=7, min_samples_leaf=5,
+            class_weight="balanced", random_state=42, n_jobs=-1,
+        )
+        clf.fit(X_s[:sp], y[:sp])
+
+        probs    = clf.predict_proba(X_s)
+        cls_list = list(clf.classes_)
+        pb = probs[:, cls_list.index(1)]  if  1 in cls_list else np.zeros(len(probs))
+        ps = probs[:, cls_list.index(-1)] if -1 in cls_list else np.zeros(len(probs))
+
+        ml_sc    = pd.Series(pb - ps, index=data.index).reindex(df.index).fillna(0)
+        combined = ml_sc * 1.4 + rule.reindex(df.index).fillna(0) * 0.6
+
+        sig = pd.Series(0, index=df.index)
+        sig[combined >  1.2] = 2;  sig[(combined >  0.4) & (combined <= 1.2)] = 1
+        sig[combined < -1.2] = -2; sig[(combined < -0.4) & (combined >= -1.2)] = -1
+
+        # Gate: require trend alignment for strong signals
+        sig[(sig > 0)  & (tfk["trend_score"].reindex(df.index).fillna(0) < 2)] = 0
+        sig[(sig < 0)  & (tfk["trend_score"].reindex(df.index).fillna(0) > 2)] = 0
+        return sig
+
+    except Exception:
+        return to_sig(rule)
+
+
+def options_strategies(tfk: dict, info: dict, av: float) -> list:
+    """
+    Derive options entry strategies from multi-timeframe trend conditions.
+    Mirrors Tradeknowlogy approach: use EMAs + RSI to pick strategy type.
+    """
+    def last(s):
+        v = s.dropna(); return bool(v.iloc[-1]) if len(v) else False
+
+    wu  = last(tfk["weekly_up"]); du  = last(tfk["daily_up"])
+    su  = last(tfk["swing_up"]);  stu = last(tfk["short_up"])
+    ov  = last(tfk["oversold"]);  ob  = last(tfk["overbought"])
+    ts  = int(wu) + int(du) + int(su) + int(stu)
+    rn  = float(tfk["rsi14"].dropna().iloc[-1]) if len(tfk["rsi14"].dropna()) else 50
+    e18n = float(tfk["e18"].dropna().iloc[-1])  if len(tfk["e18"].dropna())  else 0
+    e50n = float(tfk["e50"].dropna().iloc[-1])  if len(tfk["e50"].dropna())  else 0
+    ivl  = "Low" if av < 0.25 else "Medium" if av < 0.45 else "High"
+    out  = []
+
+    if wu and du and ts >= 3:
+        out.append(dict(type="bullish", conf="★★★",
+            name="Long Call / LEAPS",
+            why="Full trend alignment (weekly+daily+short). Green-candle regime. Ideal for directional calls.",
+            entry=f"Buy ATM–5%OTM call | 3–6m expiry | Add at EMA18 (${e18n:.2f}) dips"))
+        out.append(dict(type="bullish", conf="★★★",
+            name="Poor Man's Covered Call (PMCC)",
+            why="Strong sustained uptrend. Long deep-ITM LEAPS + sell short-dated calls to reduce cost basis.",
+            entry="Long 80-delta LEAPS 6–12m + short 30-delta call 30–45 DTE"))
+
+    if wu and du and ov:
+        out.append(dict(type="bullish", conf="★★★",
+            name="Buy / DCA  (Blue Triangle entry)",
+            why=f"RSI={rn:.0f} oversold inside confirmed uptrend. Highest-probability entry zone.",
+            entry=f"Scale in at current level | Hard stop below EMA50 (${e50n:.2f})"))
+
+    if wu and du and ts >= 2:
+        out.append(dict(type="income", conf="★★☆",
+            name="Cash-Secured Put (CSP)",
+            why=f"Weekly+daily uptrend. Sell put near EMA50 support (${e50n:.2f}). Collect premium or acquire at discount.",
+            entry=f"Sell put ~${e50n:.2f} | 30–45 DTE | {ivl} IV ({av:.0%} HV)"))
+        out.append(dict(type="income", conf="★★☆",
+            name="Covered Call",
+            why=f"Uptrend in place. EMA18 (${e18n:.2f}) may act as near-term resistance. Sell call OTM for income.",
+            entry=f"Sell call 5–8% OTM | 30 DTE | {ivl} IV"))
+
+    if wu and du and av < 0.40:
+        out.append(dict(type="income", conf="★★☆",
+            name="Jade Lizard",
+            why=f"Positive trend + {ivl} IV ({av:.0%}). Sell OTM put + OTM call spread. No upside risk if structured correctly.",
+            entry="Sell OTM put + sell OTM call spread | Net credit eliminates upside loss"))
+
+    if not wu and not du and ts <= 1:
+        out.append(dict(type="bearish", conf="★★☆",
+            name="Bear Put Spread / Long Put",
+            why="Weekly and daily trend bearish. Price below key EMAs. Red-candle / no-trend regime.",
+            entry="Buy ATM put + sell 3–5% lower put | 30–60 DTE"))
+
+    if not out:
+        out.append(dict(type="neutral", conf="★☆☆",
+            name="No Setup — Wait",
+            why=f"Mixed signals (trend score {ts}/4). No clean setup. Wait for EMA alignment.",
+            entry="Monitor: EMA50>EMA200 + price>EMA18 = readiness for CSP or long call"))
+
+    return out
+
+
+# ============================================================
 # FORECASTING
 # ============================================================
 
@@ -675,22 +919,49 @@ def echarts_area_animated(dates_list: list, series_dict: dict, title: str = "") 
 def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
                    custom_emas: list, show_bb: bool,
                    show_sigs: bool, sigs: pd.Series = None,
-                   fc: dict = None) -> dict:
-
+                   fc: dict = None, tfk_sigs: dict = None) -> dict:
+    """
+    Heikin Ashi chart with:
+    - Trend-coloured candles (green=full trend, purple=daily+weekly, default=HA red/green)
+    - Multi-signal markers: green △ buy zone, blue △ strong-buy, red ▽ sell, fucsia ▽ strong-sell
+    - EMA bounce labels (B18, B50, B200) and continuation label (C)
+    - Combo ML signal (strong buy ◆ / strong sell ◆)
+    - 3-month ARIMA forecast band
+    """
     ha     = heikin_ashi(df)
     dates  = [_date_str(d) for d in ha.index]
-    candle = [[round(r.HA_Open,2), round(r.HA_Close,2),
-               round(r.HA_Low,2),  round(r.HA_High,2)]
-              for r in ha.itertuples()]
     vol    = [int(v) if not np.isnan(v) else 0 for v in df["Volume"].fillna(0)]
     vol_colors = ["#00e87a" if ha.HA_Close.iloc[i] >= ha.HA_Open.iloc[i] else "#ff4545"
                   for i in range(len(ha))]
 
+    # ── Per-candle coloring based on trend regime ──────────────
+    candle_data = []
+    cc = tfk_sigs["candle_color"] if tfk_sigs is not None else None
+    for i, r in enumerate(ha.itertuples()):
+        val = [round(r.HA_Open,2), round(r.HA_Close,2), round(r.HA_Low,2), round(r.HA_High,2)]
+        trend_col = str(cc.iloc[i]) if (cc is not None and i < len(cc)) else "default"
+        is_up = r.HA_Close >= r.HA_Open
+
+        if trend_col == "green":
+            sty = {"color":"#00e87a","color0":"#1a7a40",
+                   "borderColor":"#00e87a","borderColor0":"#00e87a"}
+        elif trend_col == "purple":
+            sty = {"color":"#9b59b6","color0":"#6c3483",
+                   "borderColor":"#9b59b6","borderColor0":"#9b59b6"}
+        else:
+            if is_up:
+                sty = {"color":"#00e87a","borderColor":"#00e87a"}
+            else:
+                sty = {"color0":"#ff4545","borderColor0":"#ff4545",
+                       "color":"#00e87a","borderColor":"#00e87a"}
+        candle_data.append({"value": val, "itemStyle": sty})
+
     series = [{
         "name": ticker,
         "type": "candlestick",
-        "data": candle,
+        "data": candle_data,
         "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
+        # global defaults (overridden per candle above)
         "itemStyle": {
             "color": "#00e87a", "color0": "#ff4545",
             "borderColor": "#00e87a", "borderColor0": "#ff4545",
@@ -703,7 +974,7 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
     # Default EMAs
     for period, show in ema_cfg.items():
         if show:
-            vals = ema(df["Close"], int(period)).round(2).tolist()
+            vals  = ema(df["Close"], int(period)).round(2).tolist()
             color = ema_palette.get(period, "#aaa")
             series.append({
                 "name": f"EMA {period}", "type": "line", "data": vals,
@@ -715,11 +986,23 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
             })
             legend_items.append(f"EMA {period}")
 
+    # EMA 18 (always shown when tfk_sigs available)
+    if tfk_sigs is not None:
+        e18v = tfk_sigs["e18"].round(2).reindex(df.index).tolist()
+        series.append({
+            "name": "EMA 18", "type": "line", "data": e18v,
+            "smooth": True,
+            "lineStyle": {"width": 1.2, "color": "#20c0c0", "type": "dashed"},
+            "showSymbol": False,
+            "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
+        })
+        legend_items.append("EMA 18")
+
     # Custom EMAs
-    extra_colors = ["#40e0d0","#ff69b4","#c0c020","#20c0c0"]
-    for idx, p_val in enumerate(custom_emas):
+    extra_colors = ["#40e0d0","#ff69b4","#c0c020","#a0a060"]
+    for idx_c, p_val in enumerate(custom_emas):
         vals  = ema(df["Close"], p_val).round(2).tolist()
-        color = extra_colors[idx % len(extra_colors)]
+        color = extra_colors[idx_c % len(extra_colors)]
         series.append({
             "name": f"EMA {p_val}", "type": "line", "data": vals,
             "smooth": True,
@@ -733,45 +1016,133 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
     # Bollinger Bands
     if show_bb:
         bb_u, bb_m, bb_l = bollinger(df["Close"])
-        for name, vals, dash in [("BB Up", bb_u, "dashed"),
-                                   ("BB Mid", bb_m, "solid"),
-                                   ("BB Low", bb_l, "dashed")]:
+        for bname, bvals, bdash in [("BB Up", bb_u, "dashed"),
+                                     ("BB Mid", bb_m, "solid"),
+                                     ("BB Low", bb_l, "dashed")]:
             series.append({
-                "name": name, "type": "line",
-                "data": [round(v,2) if not np.isnan(v) else None for v in vals],
+                "name": bname, "type": "line",
+                "data": [round(v,2) if not np.isnan(v) else None for v in bvals],
                 "smooth": True,
-                "lineStyle": {"width": 1, "color": "rgba(90,90,200,.6)", "type": dash},
+                "lineStyle": {"width": 1, "color": "rgba(90,90,200,.6)", "type": bdash},
                 "showSymbol": False,
                 "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
             })
         legend_items += ["BB Up", "BB Mid", "BB Low"]
 
-    # Buy/Sell markers
-    if show_sigs and sigs is not None:
-        buy_idx  = [i for i, idx in enumerate(df.index)
-                    if idx in sigs.index and sigs.loc[idx] == 1]
-        sell_idx = [i for i, idx in enumerate(df.index)
-                    if idx in sigs.index and sigs.loc[idx] == -1]
-        if buy_idx:
-            series.append({
-                "name": "BUY", "type": "scatter",
-                "data": [[dates[i], round(float(df["Low"].iloc[i]) * 0.98, 2)]
-                         for i in buy_idx],
-                "symbol": "triangle", "symbolSize": 10,
-                "itemStyle": {"color": "#00e87a"},
-                "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
-            })
-            legend_items.append("BUY")
-        if sell_idx:
-            series.append({
-                "name": "SELL", "type": "scatter",
-                "data": [[dates[i], round(float(df["High"].iloc[i]) * 1.02, 2)]
-                         for i in sell_idx],
-                "symbol": "triangle", "symbolSize": 10, "symbolRotate": 180,
-                "itemStyle": {"color": "#ff4545"},
-                "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
-            })
-            legend_items.append("SELL")
+    # ── Signal markers ─────────────────────────────────────────
+    if show_sigs:
+        def mk_scatter(name, idx_list, price_fn, symbol, size, color, rotate=0):
+            data = [[dates[i], round(price_fn(i), 2)] for i in idx_list]
+            if not data:
+                return None
+            s = {"name": name, "type": "scatter", "data": data,
+                 "symbol": symbol, "symbolSize": size,
+                 "itemStyle": {"color": color},
+                 "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0}
+            if rotate:
+                s["symbolRotate"] = rotate
+            return s
+
+        def valid_idx(mask):
+            if mask is None:
+                return []
+            return [i for i, idx in enumerate(df.index)
+                    if idx in mask.index and bool(mask.loc[idx])]
+
+        if tfk_sigs is not None:
+            # Green triangle △: buy zone (near EMA18 in uptrend)
+            bg_idx = valid_idx(tfk_sigs["buy_green"])
+            s = mk_scatter("Buy Zone", bg_idx,
+                           lambda i: float(df["Low"].iloc[i]) * 0.970,
+                           "triangle", 10, "#00e87a")
+            if s: series.append(s); legend_items.append("Buy Zone")
+
+            # Blue triangle △: strong buy (RSI<30 + uptrend)
+            bb_idx = valid_idx(tfk_sigs["buy_blue"])
+            s = mk_scatter("Strong Buy", bb_idx,
+                           lambda i: float(df["Low"].iloc[i]) * 0.955,
+                           "triangle", 14, "#4da6ff")
+            if s: series.append(s); legend_items.append("Strong Buy")
+
+            # Red triangle ▽: sell zone
+            sr_idx = valid_idx(tfk_sigs["sell_red"])
+            s = mk_scatter("Sell Zone", sr_idx,
+                           lambda i: float(df["High"].iloc[i]) * 1.030,
+                           "triangle", 10, "#ff4545", rotate=180)
+            if s: series.append(s); legend_items.append("Sell Zone")
+
+            # Fucsia triangle ▽: strong sell (RSI>70 + downtrend)
+            sf_idx = valid_idx(tfk_sigs["sell_fucsia"])
+            s = mk_scatter("Strong Sell", sf_idx,
+                           lambda i: float(df["High"].iloc[i]) * 1.045,
+                           "triangle", 14, "#ff69b4", rotate=180)
+            if s: series.append(s); legend_items.append("Strong Sell")
+
+            # B18 bounce label
+            b18_idx = valid_idx(tfk_sigs["bounce_b18"])
+            if b18_idx:
+                series.append({
+                    "name": "B18", "type": "scatter",
+                    "data": [{"value": [dates[i], round(float(df["Low"].iloc[i])*0.965, 2)],
+                              "label": {"show": True, "formatter": "B18",
+                                        "position": "bottom", "color": "#00e87a",
+                                        "fontSize": 9, "fontWeight": "bold"}}
+                             for i in b18_idx],
+                    "symbol": "circle", "symbolSize": 6,
+                    "itemStyle": {"color": "#00e87a"},
+                    "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
+                })
+                legend_items.append("B18")
+
+            # B50 bounce label
+            b50_idx = valid_idx(tfk_sigs["bounce_b50"])
+            if b50_idx:
+                series.append({
+                    "name": "B50", "type": "scatter",
+                    "data": [{"value": [dates[i], round(float(df["Low"].iloc[i])*0.960, 2)],
+                              "label": {"show": True, "formatter": "B50",
+                                        "position": "bottom", "color": "#ffd700",
+                                        "fontSize": 9, "fontWeight": "bold"}}
+                             for i in b50_idx],
+                    "symbol": "circle", "symbolSize": 6,
+                    "itemStyle": {"color": "#ffd700"},
+                    "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
+                })
+                legend_items.append("B50")
+
+            # C continuation label (EMA18 crosses EMA50)
+            c_idx = valid_idx(tfk_sigs["ema18_cross"])
+            if c_idx:
+                series.append({
+                    "name": "Cont(C)", "type": "scatter",
+                    "data": [{"value": [dates[i], round(float(df["Low"].iloc[i])*0.975, 2)],
+                              "label": {"show": True, "formatter": "C",
+                                        "position": "bottom", "color": "#c0c020",
+                                        "fontSize": 9, "fontWeight": "bold",
+                                        "borderColor": "#c0c020", "borderWidth": 1,
+                                        "padding": [1, 3]}}
+                             for i in c_idx],
+                    "symbol": "rect", "symbolSize": [16, 14],
+                    "itemStyle": {"color": "rgba(192,192,32,.25)",
+                                  "borderColor": "#c0c020", "borderWidth": 1},
+                    "gridIndex": 0, "xAxisIndex": 0, "yAxisIndex": 0,
+                })
+                legend_items.append("Cont(C)")
+
+        elif sigs is not None:
+            # Fallback: plain ML buy/sell
+            buy_idx_ml  = [i for i, idx in enumerate(df.index)
+                           if idx in sigs.index and sigs.loc[idx] in (1, 2)]
+            sell_idx_ml = [i for i, idx in enumerate(df.index)
+                           if idx in sigs.index and sigs.loc[idx] in (-1, -2)]
+            s = mk_scatter("BUY", buy_idx_ml,
+                           lambda i: float(df["Low"].iloc[i]) * 0.98,
+                           "triangle", 10, "#00e87a")
+            if s: series.append(s); legend_items.append("BUY")
+            s = mk_scatter("SELL", sell_idx_ml,
+                           lambda i: float(df["High"].iloc[i]) * 1.02,
+                           "triangle", 10, "#ff4545", rotate=180)
+            if s: series.append(s); legend_items.append("SELL")
 
     # Forecast  — connect to last known price
     all_dates = dates
@@ -1508,14 +1879,49 @@ def main():
         sel = st.selectbox("Asset:", valid, key="chart_sel")
         chart_df = hist[sel].copy()
 
-        with st.spinner("Computing ML signals & forecast…"):
-            sigs = ml_signals(chart_df) if p["show_sigs"] else None
-            fc   = forecast_3m(chart_df["Close"])
+        with st.spinner("Computing trend signals & forecast…"):
+            tfk_sigs_chart = trend_follow_signals(chart_df) if p["show_sigs"] else None
+            combo_sigs     = (ml_combo_score(chart_df, tfk_sigs_chart)
+                              if (p["show_sigs"] and tfk_sigs_chart is not None) else None)
+            fc = forecast_3m(chart_df["Close"])
+
+        # ── Trend score bar ────────────────────────────────────
+        if tfk_sigs_chart is not None:
+            ts_now = int(tfk_sigs_chart["trend_score"].dropna().iloc[-1]) if len(tfk_sigs_chart["trend_score"].dropna()) else 0
+            wu_now = bool(tfk_sigs_chart["weekly_up"].dropna().iloc[-1]) if len(tfk_sigs_chart["weekly_up"].dropna()) else False
+            du_now = bool(tfk_sigs_chart["daily_up"].dropna().iloc[-1])  if len(tfk_sigs_chart["daily_up"].dropna())  else False
+            su_now = bool(tfk_sigs_chart["swing_up"].dropna().iloc[-1])  if len(tfk_sigs_chart["swing_up"].dropna())  else False
+            stu_now= bool(tfk_sigs_chart["short_up"].dropna().iloc[-1])  if len(tfk_sigs_chart["short_up"].dropna())  else False
+            rsi_now_chart = float(tfk_sigs_chart["rsi14"].dropna().iloc[-1]) if len(tfk_sigs_chart["rsi14"].dropna()) else 50
+            cc_now = str(tfk_sigs_chart["candle_color"].dropna().iloc[-1]) if len(tfk_sigs_chart["candle_color"].dropna()) else "default"
+
+            def flag(b): return "✅" if b else "⬜"
+            tc_col = "#00e87a" if cc_now == "green" else "#9b59b6" if cc_now == "purple" else "#888"
+            rsi_col = "#4da6ff" if rsi_now_chart < 30 else "#ff4545" if rsi_now_chart > 70 else "#94a3b8"
+            st.markdown(f"""
+            <div style="background:#162233;border:1px solid #1e3550;border-radius:8px;
+                        padding:10px 16px;margin-bottom:8px;display:flex;gap:24px;
+                        align-items:center;flex-wrap:wrap;">
+              <span style="color:#7090b0;font-size:.75em;">TREND SCORE</span>
+              <span style="color:{tc_col};font-size:1.3em;font-weight:700;">{ts_now}/4</span>
+              <span style="color:#7090b0;font-size:.75em;">
+                {flag(wu_now)} Weekly &nbsp;
+                {flag(du_now)} Daily &nbsp;
+                {flag(su_now)} Swing &nbsp;
+                {flag(stu_now)} Short
+              </span>
+              <span style="color:#7090b0;font-size:.75em;">CANDLE</span>
+              <span style="color:{tc_col};font-size:.85em;font-weight:600;">{cc_now.upper()}</span>
+              <span style="color:#7090b0;font-size:.75em;">RSI&nbsp;</span>
+              <span style="color:{rsi_col};font-size:.95em;font-weight:600;">{rsi_now_chart:.1f}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
         if ECHARTS_OK:
             candle_opt = echarts_candle(chart_df, sel, p["ema_cfg"],
                                         p["custom_emas"], p["show_bb"],
-                                        p["show_sigs"], sigs, fc)
+                                        p["show_sigs"], combo_sigs, fc,
+                                        tfk_sigs=tfk_sigs_chart)
             st_echarts(options=candle_opt, height="620px")
         elif PLOTLY_OK:
             ha    = heikin_ashi(chart_df)
@@ -1575,6 +1981,35 @@ def main():
                     f"<div class='sig-{val_cls}' style='margin-top:8px;'>"
                     f"Valuation: {rec['valuation'].upper()}</div>",
                     unsafe_allow_html=True)
+
+                # ── Options strategies ──────────────────────────
+                st.markdown("---")
+                st.markdown("**Options Strategy Recommendations:**")
+                try:
+                    t_sigs = trend_follow_signals(hist[t])
+                    av_v   = ann_vol(hist[t]["Close"].pct_change().dropna())
+                    strats = options_strategies(t_sigs, info_d, av_v)
+                    type_colors = {
+                        "bullish": "#00e87a", "income": "#ffd700",
+                        "bearish": "#ff4545", "neutral": "#94a3b8",
+                        "bullish-neutral": "#40e0d0",
+                    }
+                    for st_rec in strats:
+                        tc = type_colors.get(st_rec["type"], "#94a3b8")
+                        st.markdown(f"""
+<div style="background:#162233;border:1px solid #1e3550;border-left:3px solid {tc};
+            border-radius:6px;padding:10px 14px;margin:6px 0;">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:{tc};font-weight:700;font-size:.9em;">{st_rec['name']}</span>
+    <span style="color:#ffd700;font-size:.85em;">{st_rec['conf']}</span>
+  </div>
+  <div style="color:#94a3b8;font-size:.82em;margin-top:4px;">{st_rec['why']}</div>
+  <div style="color:#c8daf0;font-size:.8em;margin-top:4px;">
+    <span style="color:#7090b0;">Entry: </span>{st_rec['entry']}
+  </div>
+</div>""", unsafe_allow_html=True)
+                except Exception:
+                    pass
 
                 news = fetch_news(t)
                 if news:
