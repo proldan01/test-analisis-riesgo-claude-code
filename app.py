@@ -628,15 +628,26 @@ def echarts_area_animated(dates_list: list, series_dict: dict, title: str = "") 
     return {
         "backgroundColor": "#0f1923",
         "animation": True,
-        "title": {"text": title, "textStyle": {"color": "#e0e0e0", "fontSize": 12}},
+        # Title is rendered by Streamlit sec-hdr above the chart — no ECharts title needed
         "tooltip": {
             "trigger": "axis",
             "backgroundColor": "rgba(15,25,35,.97)",
             "borderColor": "#1e3550",
             "textStyle": {"color": "#dce8f5", "fontSize": 11},
         },
-        "legend": {"textStyle": {"color": "#94a3b8"}, "top": "5%"},
-        "grid": {"left": "6%", "right": "3%", "bottom": "12%", "containLabel": True},
+        "legend": {
+            "type": "scroll",
+            "top": "1%",
+            "left": "center",
+            "width": "90%",
+            "pageIconColor": "#94a3b8",
+            "pageTextStyle": {"color": "#94a3b8"},
+            "textStyle": {"color": "#94a3b8", "fontSize": 11},
+            "icon": "roundRect",
+            "itemHeight": 8,
+            "itemGap": 18,
+        },
+        "grid": {"left": "6%", "right": "3%", "top": "10%", "bottom": "12%", "containLabel": True},
         "xAxis": {
             "type": "category", "data": dates_list,
             "axisLabel": {"color": "#7a9ab8", "fontSize": 10},
@@ -651,7 +662,7 @@ def echarts_area_animated(dates_list: list, series_dict: dict, title: str = "") 
         "dataZoom": [
             {"type": "inside", "start": 60, "end": 100},
             {"type": "slider", "start": 60, "end": 100,
-             "borderColor": "#1e1e3a", "fillerColor": "rgba(0,232,122,.08)",
+             "borderColor": "#1e3550", "fillerColor": "rgba(0,232,122,.10)",
              "textStyle": {"color": "#7a9ab8"}, "bottom": "1%"},
         ],
         "series": series,
@@ -821,20 +832,20 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
             "borderColor": "#1e3550",
             "textStyle": {"color": "#dce8f5", "fontSize": 11},
         },
-        # Scrollable legend – prevents overlap
+        # Scrollable legend — single row at very top, grid starts below it
         "legend": {
             "type": "scroll",
             "data": legend_items,
-            "top": "0%", "left": "center", "width": "96%",
+            "top": "1%", "left": "center", "width": "98%",
             "pageIconColor": "#94a3b8", "pageTextStyle": {"color": "#94a3b8"},
-            "textStyle": {"color": "#94a3b8", "fontSize": 10},
-            "icon": "roundRect", "itemHeight": 8, "itemGap": 14,
+            "textStyle": {"color": "#c8daf0", "fontSize": 10},
+            "icon": "roundRect", "itemHeight": 8, "itemGap": 16,
         },
         "axisPointer": {"link": [{"xAxisIndex": "all"}]},
         "grid": [
-            {"left": "7%", "right": "3%", "top": "10%", "height": "51%"},
-            {"left": "7%", "right": "3%", "top": "65%", "height": "12%"},
-            {"left": "7%", "right": "3%", "top": "80%", "height": "12%"},
+            {"left": "7%", "right": "3%", "top": "8%",  "height": "52%"},
+            {"left": "7%", "right": "3%", "top": "64%", "height": "12%"},
+            {"left": "7%", "right": "3%", "top": "79%", "height": "12%"},
         ],
         "xAxis": [
             {"type": "category", "data": all_dates, "gridIndex": 0,
@@ -873,6 +884,8 @@ def echarts_candle(df: pd.DataFrame, ticker: str, ema_cfg: dict,
 # ============================================================
 
 def _dark_layout(**kw):
+    # Use underscore notation for axis props so callers can also pass
+    # xaxis=dict(...) or xaxis_something=... without duplicate-key TypeError
     base = dict(
         template="plotly_dark",
         paper_bgcolor="#0f1923",
@@ -880,8 +893,10 @@ def _dark_layout(**kw):
         font=dict(color="#94a3b8", size=11),
         margin=dict(l=50, r=20, t=45, b=40),
         hovermode="x unified",
-        xaxis=dict(gridcolor="#1e3550", zerolinecolor="#1e3550"),
-        yaxis=dict(gridcolor="#1e3550", zerolinecolor="#1e3550"),
+        xaxis_gridcolor="#1e3550",
+        xaxis_zerolinecolor="#1e3550",
+        yaxis_gridcolor="#1e3550",
+        yaxis_zerolinecolor="#1e3550",
     )
     base.update(kw)
     return base
@@ -895,7 +910,7 @@ def plotly_perf(prices_df: pd.DataFrame, bench: pd.Series, bench_name: str):
     if bench is not None and not bench.empty:
         nb = bench / bench.dropna().iloc[0] * 100
         fig.add_trace(go.Scatter(x=nb.index, y=nb, name=bench_name,
-                                 line=dict(color="#555", width=2, dash="dash")))
+                                 line=dict(color="#4a6a8a", width=2, dash="dash")))
     fig.update_layout(title="Normalized Performance (Base 100)",
                       yaxis_title="Indexed Price", **_dark_layout(height=380))
     return fig
@@ -907,7 +922,7 @@ def plotly_rolling_beta(returns_df: pd.DataFrame, bench_ret: pd.Series):
         fig.add_trace(go.Scatter(x=rb.index, y=rb, name=col,
                                  line=dict(color=PLOTLY_COLORS[i % len(PLOTLY_COLORS)], width=1.5)))
     fig.add_hline(y=1, line_dash="dash", line_color="#333",
-                  annotation_text="β = 1", annotation_font_color="#555")
+                  annotation_text="β = 1", annotation_font_color="#7a9ab8")
     fig.update_layout(title="Rolling 60-Day Beta", yaxis_title="Beta", **_dark_layout(height=320))
     return fig
 
@@ -1035,8 +1050,8 @@ def plotly_pair_scatter(returns_df: pd.DataFrame, t1: str, t2: str):
         title=f"Pair Returns Scatter: {t1} vs {t2}   (ρ = {corr_val:.3f})",
         xaxis_title=f"{t1} Daily Return (%)",
         yaxis_title=f"{t2} Daily Return (%)",
-        xaxis=dict(ticksuffix="%"),
-        yaxis=dict(ticksuffix="%"),
+        xaxis_ticksuffix="%",
+        yaxis_ticksuffix="%",
         **_dark_layout(height=420),
     )
     return fig
@@ -1125,8 +1140,8 @@ def plotly_mc_frontier(mc: dict) -> go.Figure:
         title=f"Monte Carlo Efficient Frontier  ({len(mc['vols']):,} portfolios)",
         xaxis_title="Annualized Volatility (%)",
         yaxis_title="Annualized Return (%)",
-        xaxis=dict(ticksuffix="%"),
-        yaxis=dict(ticksuffix="%"),
+        xaxis_ticksuffix="%",
+        yaxis_ticksuffix="%",
         **_dark_layout(height=520),
     )
     return fig
@@ -1353,7 +1368,7 @@ def main():
         st.session_state.running = False
 
     st.markdown("""
-    <div style="border-bottom:1px solid #1e1e3a;padding-bottom:12px;margin-bottom:18px;">
+    <div style="border-bottom:1px solid #1e3550;padding-bottom:12px;margin-bottom:18px;">
       <span style="color:#e0e0e0;font-size:1.5em;font-weight:700;
                    font-family:'Share Tech Mono',monospace;">
         📈 Financial Intelligence Platform
