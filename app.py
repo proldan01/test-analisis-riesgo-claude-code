@@ -1938,6 +1938,107 @@ def main():
                                 title=f"{sel} — Heikin Ashi")
             st.plotly_chart(fig_c, use_container_width=True)
 
+        # ── Signal reference legend ────────────────────────────
+        with st.expander("📖 Signal Reference Guide", expanded=False):
+            st.markdown("""
+<style>
+.ref-table { width:100%; border-collapse:collapse; font-size:.85em; }
+.ref-table th { background:#1a2840; color:#8aacca; text-align:left;
+                padding:7px 12px; border-bottom:2px solid #1e3550; }
+.ref-table td { padding:7px 12px; border-bottom:1px solid #1e3550;
+                color:#c8daf0; vertical-align:top; }
+.ref-table tr:hover td { background:#162d44; }
+.dot { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+.tri-up   { display:inline-block; width:0; height:0;
+            border-left:6px solid transparent; border-right:6px solid transparent;
+            border-bottom:11px solid currentColor; margin-right:4px; vertical-align:middle; }
+.tri-dn   { display:inline-block; width:0; height:0;
+            border-left:6px solid transparent; border-right:6px solid transparent;
+            border-top:11px solid currentColor; margin-right:4px; vertical-align:middle; }
+.lbl-box  { display:inline-block; border:1px solid; border-radius:3px;
+            padding:1px 5px; font-size:.78em; font-family:monospace; margin-right:4px; }
+</style>
+
+**Candle Coloring — Trend Regime**
+
+<table class="ref-table">
+<tr><th>Color</th><th>Condition</th><th>Action</th></tr>
+<tr>
+  <td><span class="dot" style="background:#00e87a"></span><b style="color:#00e87a">Green</b></td>
+  <td>Weekly + Daily + Short-term EMAs all bullish<br><small style="color:#7090b0">EMA65&gt;EMA130 &amp; EMA50&gt;EMA200 &amp; EMA5&gt;EMA20</small></td>
+  <td>Full trend alignment — highest quality setup. Trade it.</td>
+</tr>
+<tr>
+  <td><span class="dot" style="background:#9b59b6"></span><b style="color:#9b59b6">Purple</b></td>
+  <td>Weekly + Daily bullish; short-term not yet<br><small style="color:#7090b0">EMA65&gt;EMA130 &amp; EMA50&gt;EMA200, but EMA5&lt;EMA20</small></td>
+  <td>Seek early entries. Wait for EMA5&gt;EMA20 confirmation.</td>
+</tr>
+<tr>
+  <td><span class="dot" style="background:#888"></span><b style="color:#888">Default HA</b></td>
+  <td>Weekly or daily trend not confirmed</td>
+  <td>No trend — avoid new longs. Wait for regime change.</td>
+</tr>
+</table>
+
+<br>**Signal Markers**
+
+<table class="ref-table">
+<tr><th>Marker</th><th>Meaning</th><th>Suggested action</th></tr>
+<tr>
+  <td><span class="tri-up" style="color:#00e87a"></span><b style="color:#00e87a">Green △</b><br><small>below bar</small></td>
+  <td>Price near EMA18 in uptrend (weekly + daily). Buy zone.</td>
+  <td>Look for entry trigger. Scale in or sell CSP near EMA18.</td>
+</tr>
+<tr>
+  <td><span class="tri-up" style="color:#4da6ff"></span><b style="color:#4da6ff">Blue △</b><br><small>below bar (larger)</small></td>
+  <td>RSI &lt; 30 oversold inside confirmed uptrend. Extreme entry.</td>
+  <td>High-probability buy. DCA or buy call/LEAPS. Stop below EMA50.</td>
+</tr>
+<tr>
+  <td><span class="tri-dn" style="color:#ff4545"></span><b style="color:#ff4545">Red ▽</b><br><small>above bar</small></td>
+  <td>Price near EMA18 in downtrend. Sell / no-trade zone.</td>
+  <td>Avoid new longs. Consider taking profit or trimming position.</td>
+</tr>
+<tr>
+  <td><span class="tri-dn" style="color:#ff69b4"></span><b style="color:#ff69b4">Fucsia ▽</b><br><small>above bar (larger)</small></td>
+  <td>RSI &gt; 70 overbought + downtrend. Strong sell signal.</td>
+  <td>Close longs. Consider bear put spread if trend deteriorates.</td>
+</tr>
+<tr>
+  <td><span class="lbl-box" style="color:#00e87a;border-color:#00e87a">B18</span></td>
+  <td>Price crossed above EMA18 from below — bounce confirmation.</td>
+  <td>Good continuation entry if green triangle also present.</td>
+</tr>
+<tr>
+  <td><span class="lbl-box" style="color:#ffd700;border-color:#ffd700">B50</span></td>
+  <td>Price crossed above EMA50 from below — key level reclaimed.</td>
+  <td>Trend re-establishment. Stronger signal when RSI &lt; 50 before cross.</td>
+</tr>
+<tr>
+  <td><span class="lbl-box" style="color:#c0c020;border-color:#c0c020">C</span></td>
+  <td>EMA18 crossed above EMA50 — continuation pattern triggered.</td>
+  <td>Not a direct entry. Wait for a trigger candle (green or B18) after C mark.</td>
+</tr>
+</table>
+
+<br>**Trend Score Bar (above chart)**
+
+<table class="ref-table">
+<tr><th>Score</th><th>Regime</th><th>Suitable strategies</th></tr>
+<tr><td><b style="color:#00e87a">4/4</b></td><td>Full green-candle trend</td><td>Long Call · LEAPS · PMCC · DCA</td></tr>
+<tr><td><b style="color:#00e87a">3/4</b></td><td>Strong — short-term lag</td><td>CSP near EMA18 · Covered Call · wait for trigger</td></tr>
+<tr><td><b style="color:#ffd700">2/4</b></td><td>Mixed — purple candles</td><td>CSP far OTM · Jade Lizard · reduce size</td></tr>
+<tr><td><b style="color:#ff4545">0–1/4</b></td><td>No trend or downtrend</td><td>Bear spread · cash · wait</td></tr>
+</table>
+
+<br><small style="color:#5a7a96">
+RSI zones: <b style="color:#4da6ff">&lt; 30</b> = oversold (blue △ zone) &nbsp;|&nbsp;
+<b style="color:#94a3b8">30–70</b> = neutral &nbsp;|&nbsp;
+<b style="color:#ff4545">&gt; 70</b> = overbought (fucsia ▽ zone)<br>
+This guide is for analytical reference only. Not financial advice.
+</small>
+""", unsafe_allow_html=True)
+
         # Signal cards & insights
         st.markdown("<div class='sec-hdr'>Signal Analysis &amp; Insights</div>",
                     unsafe_allow_html=True)
